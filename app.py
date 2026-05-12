@@ -125,8 +125,13 @@ FRUIT_COLOR_PROFILES = {
 def decode_image(data_url_or_b64):
     if "," in data_url_or_b64:
         data_url_or_b64 = data_url_or_b64.split(",")[1]
+    # Add padding if needed
+    missing_padding = len(data_url_or_b64) % 4
+    if missing_padding:
+        data_url_or_b64 += '=' * (4 - missing_padding)
     img_bytes = base64.b64decode(data_url_or_b64)
-    image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    image = Image.open(io.BytesIO(img_bytes))
+    image = image.convert("RGB")
     return image
 
 def pil_to_cv2(pil_img):
@@ -204,27 +209,30 @@ def estimate_volume(mask, depth_map, image_size):
     else:
         avg_depth = float(np.mean(fruit_depth_values))
 
-    # Estimate real-world size assuming standard photo distance (~50cm)
-    # 1 pixel ≈ 0.05cm at 50cm distance with typical phone camera
-    PIXEL_TO_CM = 0.05
-    pixel_area_cm2 = PIXEL_TO_CM ** 2
-    projected_area_cm2 = fruit_pixels * pixel_area_cm2
-
-    # Estimate depth extent from avg_depth (0-1 → 2-20cm)
-    depth_extent_cm = 2 + avg_depth * 18
-
-    # Volume of ellipsoid approximation: V = (4/3)π * a * b * c
-    # where a,b = sqrt of projected area / π, c = depth/2
+    # Estimate real-world diameter assuming fruit occupies
+    # a known fraction of the image at ~50cm distance
+    # Typical fruit diameter: 6-12cm
+    # We estimate based on fraction of image the fruit takes up
     import math
-    if projected_area_cm2 > 0:
-        ab = math.sqrt(projected_area_cm2 / math.pi)
-        c = depth_extent_cm / 2
-        volume_cm3 = (4/3) * math.pi * ab * ab * c
-    else:
-        volume_cm3 = 100  # fallback
 
-    # Clamp to realistic range
-    volume_cm3 = max(15, min(volume_cm3, 3000))
+    # Assume image represents ~30cm wide field of view at arm's length
+    FIELD_OF_VIEW_CM = 30.0
+    image_width_cm = FIELD_OF_VIEW_CM
+    image_height_cm = FIELD_OF_VIEW_CM * (h / w)
+
+    # Fruit projected area in cm²
+    fruit_width_fraction = math.sqrt(fruit_ratio)
+    fruit_diameter_cm = fruit_width_fraction * image_width_cm
+    # Clamp to realistic fruit size (3cm to 25cm diameter)
+    fruit_diameter_cm = max(3.0, min(fruit_diameter_cm, 25.0))
+
+    radius_cm = fruit_diameter_cm / 2
+    # Volume of sphere approximation
+    volume_cm3 = (4/3) * math.pi * (radius_cm ** 3)
+
+    # Clamp to realistic range (15–2000 cm³)
+    volume_cm3 = max(15, min(volume_cm3, 2000))
+    projected_area_cm2 = math.pi * (radius_cm ** 2)
     return round(volume_cm3, 2), round(projected_area_cm2, 2)
 
 # ── Step 5: Mass and calorie calculation ─────────────────────────────────────
