@@ -214,15 +214,15 @@ def estimate_volume(mask, depth_map, image_size):
     # If fruit fills 20% of image → medium fruit ~8cm
     # If fruit fills 50%+ of image → large fruit ~12cm
     if fruit_ratio < 0.05:
-        diameter_cm = 4.0
+        diameter_cm = 3.0
     elif fruit_ratio < 0.15:
-        diameter_cm = 6.0
+        diameter_cm = 5.0
     elif fruit_ratio < 0.30:
-        diameter_cm = 8.0
+        diameter_cm = 6.5
     elif fruit_ratio < 0.50:
-        diameter_cm = 10.0
+        diameter_cm = 7.5
     else:
-        diameter_cm = 12.0
+        diameter_cm = 8.5
 
     radius_cm = diameter_cm / 2.0
     # Sphere volume
