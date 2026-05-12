@@ -197,41 +197,37 @@ def estimate_depth(image, mask):
 
 # ── Step 4: Volume estimation ─────────────────────────────────────────────────
 def estimate_volume(mask, depth_map, image_size):
+    import math
     w, h = image_size
-    fruit_pixels = np.sum(mask > 127)
+    fruit_pixels = int(np.sum(mask > 127))
     total_pixels = w * h
     fruit_ratio = fruit_pixels / total_pixels
 
-    # Average depth in fruit region
-    fruit_depth_values = depth_map[mask > 127]
-    if len(fruit_depth_values) == 0:
-        avg_depth = 0.5
+    # Typical fruit diameters in cm:
+    # small (strawberry/cherry): 3-5cm
+    # medium (apple/orange/pear): 7-10cm
+    # large (mango/pomegranate): 10-14cm
+    # very large (pineapple/watermelon): 15-25cm
+
+    # Map fruit_ratio to diameter
+    # If fruit fills 5% of image → small fruit ~4cm
+    # If fruit fills 20% of image → medium fruit ~8cm
+    # If fruit fills 50%+ of image → large fruit ~12cm
+    if fruit_ratio < 0.05:
+        diameter_cm = 4.0
+    elif fruit_ratio < 0.15:
+        diameter_cm = 6.0
+    elif fruit_ratio < 0.30:
+        diameter_cm = 8.0
+    elif fruit_ratio < 0.50:
+        diameter_cm = 10.0
     else:
-        avg_depth = float(np.mean(fruit_depth_values))
+        diameter_cm = 12.0
 
-    # Estimate real-world diameter assuming fruit occupies
-    # a known fraction of the image at ~50cm distance
-    # Typical fruit diameter: 6-12cm
-    # We estimate based on fraction of image the fruit takes up
-    import math
-
-    # Assume image represents ~30cm wide field of view at arm's length
-    FIELD_OF_VIEW_CM = 30.0
-    image_width_cm = FIELD_OF_VIEW_CM
-    image_height_cm = FIELD_OF_VIEW_CM * (h / w)
-
-    # Fruit projected area in cm²
-    fruit_width_fraction = math.sqrt(fruit_ratio)
-    fruit_diameter_cm = fruit_width_fraction * image_width_cm
-    # Clamp to realistic fruit size (3cm to 25cm diameter)
-    fruit_diameter_cm = max(3.0, min(fruit_diameter_cm, 25.0))
-
-    radius_cm = fruit_diameter_cm / 2
-    # Volume of sphere approximation
-    volume_cm3 = (4/3) * math.pi * (radius_cm ** 3)
-
-    # Clamp to realistic range (15–2000 cm³)
-    volume_cm3 = max(15, min(volume_cm3, 2000))
+    radius_cm = diameter_cm / 2.0
+    # Sphere volume
+    volume_cm3 = (4.0/3.0) * math.pi * (radius_cm ** 3)
+    volume_cm3 = max(15.0, min(volume_cm3, 1500.0))
     projected_area_cm2 = math.pi * (radius_cm ** 2)
     return round(volume_cm3, 2), round(projected_area_cm2, 2)
 
